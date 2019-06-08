@@ -54,7 +54,7 @@ public class CacheExpires2Test extends ProxyTestBase {
         .willReturn(
             aResponse()
                 .withStatus(200)
-                .withHeader("Cache-Control", "public")
+                .withHeader("HttpResponseCache-Control", "public")
                 .withHeader("ETag", "tag0")
                 .withHeader("Date", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis())))
                 .withHeader("Expires", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis() + 5000)))
@@ -63,7 +63,7 @@ public class CacheExpires2Test extends ProxyTestBase {
         .willReturn(
             aResponse()
                 .withStatus(304)
-                .withHeader("Cache-Control", "public")
+                .withHeader("HttpResponseCache-Control", "public")
                 .withHeader("etag", "tag1")
                 .withHeader("Date", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis())))
                 .withHeader("Expires", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis() + 5000))))
@@ -72,7 +72,7 @@ public class CacheExpires2Test extends ProxyTestBase {
         .willReturn(
             aResponse()
                 .withStatus(200)
-                .withHeader("Cache-Control", "public")
+                .withHeader("HttpResponseCache-Control", "public")
                 .withHeader("ETag", "tag1")
                 .withHeader("Date", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis())))
                 .withHeader("Expires", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis() + 5000)))
@@ -123,7 +123,7 @@ public class CacheExpires2Test extends ProxyTestBase {
         .willReturn(
             aResponse()
                 .withStatus(200)
-                .withHeader("Cache-Control", "public")
+                .withHeader("HttpResponseCache-Control", "public")
                 .withHeader("ETag", "tag0")
                 .withHeader("Date", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis())))
                 .withHeader("Expires", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis() + 5000)))
@@ -133,7 +133,7 @@ public class CacheExpires2Test extends ProxyTestBase {
         .willReturn(
             aResponse()
                 .withStatus(200)
-                .withHeader("Cache-Control", "public")
+                .withHeader("HttpResponseCache-Control", "public")
                 .withHeader("etag", "tag1")
                 .withHeader("Date", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis())))
                 .withHeader("Expires", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis() + 5000)))
@@ -142,7 +142,7 @@ public class CacheExpires2Test extends ProxyTestBase {
         .willReturn(
             aResponse()
                 .withStatus(200)
-                .withHeader("Cache-Control", "public")
+                .withHeader("HttpResponseCache-Control", "public")
                 .withHeader("etag", "tag1")
                 .withHeader("Date", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis())))
                 .withHeader("Expires", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis() + 5000)))));
@@ -195,7 +195,7 @@ public class CacheExpires2Test extends ProxyTestBase {
         .willReturn(
             aResponse()
                 .withStatus(200)
-                .withHeader("Cache-Control", "public")
+                .withHeader("HttpResponseCache-Control", "public")
                 .withHeader("ETag", "tag0")
                 .withHeader("Date", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis())))
                 .withHeader("Expires", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis() + 5000)))
@@ -204,7 +204,7 @@ public class CacheExpires2Test extends ProxyTestBase {
         .willReturn(
             aResponse()
                 .withStatus(status)
-                .withHeader("Cache-Control", "public")
+                .withHeader("HttpResponseCache-Control", "public")
                 .withHeader("ETag", "tag0")
                 .withHeader("Date", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis())))
                 .withHeader("Expires", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis() + 5000)))));
@@ -240,7 +240,7 @@ public class CacheExpires2Test extends ProxyTestBase {
         .willReturn(
             aResponse()
                 .withStatus(200)
-                .withHeader("Cache-Control", "public")
+                .withHeader("HttpResponseCache-Control", "public")
                 .withHeader("ETag", "tag0")
                 .withHeader("Date", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis())))
                 .withHeader("Expires", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis() + 5000)))
@@ -249,7 +249,7 @@ public class CacheExpires2Test extends ProxyTestBase {
         .willReturn(
             aResponse()
                 .withStatus(200)
-                .withHeader("Cache-Control", "public")
+                .withHeader("HttpResponseCache-Control", "public")
                 .withHeader("ETag", "tag0")
                 .withHeader("Date", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis())))
                 .withHeader("Expires", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis() + 5000)))));

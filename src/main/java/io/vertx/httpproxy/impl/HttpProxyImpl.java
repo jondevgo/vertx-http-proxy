@@ -12,11 +12,10 @@ import io.vertx.core.streams.WriteStream;
 import io.vertx.httpproxy.HttpProxy;
 import io.vertx.httpproxy.ProxyRequest;
 import io.vertx.httpproxy.ProxyResponse;
+import io.vertx.httpproxy.HttpResponseCache;
 
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.function.Function;
 
 /**
@@ -26,7 +25,7 @@ public class HttpProxyImpl implements HttpProxy {
 
   private final HttpClient client;
   private Function<HttpServerRequest, Future<SocketAddress>> targetSelector = req -> Future.failedFuture("No target available");
-  private final Map<String, Resource> cache = new HashMap<>();
+  private HttpResponseCache cache;
   private Function<String, String> urlRewriter;
 
   public HttpProxyImpl(HttpClient client) {
@@ -58,6 +57,12 @@ public class HttpProxyImpl implements HttpProxy {
   @Override
   public HttpProxy urlRewriter(Function<String, String> urlRewriter) {
     this.urlRewriter = urlRewriter;
+    return this;
+  }
+
+  @Override
+  public HttpProxy cache(HttpResponseCache cache) {
+    this.cache = cache;
     return this;
   }
 
@@ -137,7 +142,9 @@ public class HttpProxyImpl implements HttpProxy {
         public ReadStream<Buffer> endHandler(Handler<Void> endHandler) {
           if (endHandler != null) {
             s.endHandler(v -> {
-              cache.put(absoluteUri, Resource.this);
+              if (cache != null) {
+                cache.put(absoluteUri, Resource.this);
+              }
               endHandler.handle(null);
             });
           } else {
@@ -529,7 +536,7 @@ public class HttpProxyImpl implements HttpProxy {
 
   private boolean serveFromCache(HttpServerRequest request) {
     String cacheKey = request.absoluteURI();
-    Resource resource = cache.get(cacheKey);
+    Resource resource = (Resource) cache.get(cacheKey);
     if (resource == null) {
       return false;
     }
@@ -576,7 +583,7 @@ public class HttpProxyImpl implements HttpProxy {
 
   @Override
   public void handle(HttpServerRequest request) {
-    if (!serveFromCache(request)) {
+    if (cache == null || !serveFromCache(request)) {
       doReq(request, null);
     }
   }
@@ -596,7 +603,7 @@ public class HttpProxyImpl implements HttpProxy {
         proxyReq.send(ar1 -> {
           if (ar1.succeeded()) {
             ProxyResponse proxyResp = ar1.result();
-            if (resource != null && (proxyResp.statusCode() == 200 || proxyResp.statusCode() == 304 )) {
+            if (cache != null && resource != null && (proxyResp.statusCode() == 200 || proxyResp.statusCode() == 304 )) {
               if (resource.revalidate(proxyResp)) {
                 CachedHttpClientResponse cachedResp = resource.response();
                 proxyResp.set(cachedResp);

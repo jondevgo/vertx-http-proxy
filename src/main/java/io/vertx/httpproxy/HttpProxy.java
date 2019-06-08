@@ -33,6 +33,8 @@ public interface HttpProxy extends Handler<HttpServerRequest> {
   @Fluent
   HttpProxy urlRewriter(Function<String, String> urlRewriter);
 
+  HttpProxy cache(HttpResponseCache cache);
+
   void handle(HttpServerRequest request);
 
   ProxyRequest proxy(HttpServerRequest request, SocketAddress target);
