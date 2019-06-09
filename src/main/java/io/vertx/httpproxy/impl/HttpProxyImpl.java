@@ -66,7 +66,7 @@ public class HttpProxyImpl implements HttpProxy {
     return this;
   }
 
-  private class Resource implements Function<ReadStream<Buffer>, ReadStream<Buffer>> {
+  private class Resource implements HttpResponseCache.Response, Function<ReadStream<Buffer>, ReadStream<Buffer>> {
 
     private final String absoluteUri;
     private final int statusCode;
@@ -88,6 +88,18 @@ public class HttpProxyImpl implements HttpProxy {
       this.maxAge = maxAge;
       this.lastModified = lastModifiedHeader != null ? ParseUtils.parseHeaderDate(lastModifiedHeader) : null;
       this.etag = headers.get(HttpHeaders.ETAG);
+    }
+
+    public long getTimestamp() {
+      return this.timestamp;
+    }
+
+    public long getMaxAge() {
+      return this.maxAge;
+    }
+
+    public long getSize() {
+      return this.content.length();
     }
 
     boolean revalidate(ProxyResponse response) {
