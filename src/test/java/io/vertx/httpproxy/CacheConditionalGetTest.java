@@ -45,7 +45,7 @@ public class CacheConditionalGetTest extends ProxyTestBase {
         .willReturn(
             aResponse()
                 .withStatus(200)
-                .withHeader("HttpResponseCache-Control", "public")
+                .withHeader("Cache-Control", "public")
                 .withHeader("ETag", "tag0")
                 .withHeader("Date", ParseUtils.formatHttpDate(new Date(now)))
                 .withHeader("Last-Modified", ParseUtils.formatHttpDate(new Date(now - 5000)))

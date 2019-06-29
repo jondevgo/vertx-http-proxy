@@ -138,7 +138,7 @@
           </systemPropertyVariables>
           <argLine>-server -Xms128m -Xmx1024m -XX:NewRatio=2</argLine>
           <includes>
-            <include>**/*Test.*</include>
+            <include>**/*Test.java</include>
           </includes>
         </configuration>
       </plugin>
