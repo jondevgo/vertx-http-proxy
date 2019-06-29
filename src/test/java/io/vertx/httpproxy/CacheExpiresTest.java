@@ -51,7 +51,7 @@ public class CacheExpiresTest extends ProxyTestBase {
     Async latch = ctx.async();
     testPublic(ctx, resp1 -> {
       vertx.setTimer(2000, id -> {
-        client.request(method, 8080, "localhost", "/", resp2 -> {
+        client.request(method, FRONTEND_PORT, "localhost", "/", resp2 -> {
           ctx.assertEquals(200, resp2.statusCode());
           resp2.bodyHandler(buff2 -> {
             if (method == HttpMethod.HEAD) {
@@ -73,7 +73,7 @@ public class CacheExpiresTest extends ProxyTestBase {
     Async latch = ctx.async();
     testPublic(ctx, resp1 -> {
       vertx.setTimer(6000, id -> {
-        client.getNow(8080, "localhost", "/", resp2 -> {
+        client.getNow(FRONTEND_PORT, "localhost", "/", resp2 -> {
           ctx.assertEquals(200, resp2.statusCode());
           resp2.bodyHandler(buff2 -> {
             ctx.assertEquals("content", buff2.toString());
@@ -91,7 +91,7 @@ public class CacheExpiresTest extends ProxyTestBase {
     Async latch = ctx.async();
     testPublic(ctx, resp1 -> {
       vertx.setTimer(1000, id -> {
-        client.get(8080, "localhost", "/", resp2 -> {
+        client.get(FRONTEND_PORT, "localhost", "/", resp2 -> {
           ctx.assertEquals(200, resp2.statusCode());
           resp2.bodyHandler(buff2 -> {
             ctx.assertEquals("content", buff2.toString());
@@ -109,7 +109,7 @@ public class CacheExpiresTest extends ProxyTestBase {
     Async latch = ctx.async();
     testPublic(ctx, resp1 -> {
       vertx.setTimer(1000, id -> {
-        client.get(8080, "localhost", "/", resp2 -> {
+        client.get(FRONTEND_PORT, "localhost", "/", resp2 -> {
           ctx.assertEquals(200, resp2.statusCode());
           resp2.bodyHandler(buff2 -> {
             ctx.assertEquals("content", buff2.toString());
@@ -123,7 +123,7 @@ public class CacheExpiresTest extends ProxyTestBase {
   }
 
   private void testPublic(TestContext ctx, Handler<HttpClientResponse> respHandler) throws Exception {
-    SocketAddress backend = startHttpBackend(ctx, 8081, req -> {
+    SocketAddress backend = startHttpBackend(ctx, BACKEND_PORT, req -> {
       hits.incrementAndGet();
       ctx.assertEquals(HttpMethod.GET, req.method());
       Date now = new Date();
@@ -134,7 +134,7 @@ public class CacheExpiresTest extends ProxyTestBase {
           .end("content");
     });
     startProxy(backend);
-    client.getNow(8080, "localhost", "/", resp -> {
+    client.getNow(FRONTEND_PORT, "localhost", "/", resp -> {
       ctx.assertEquals(200, resp.statusCode());
       resp.bodyHandler(buff -> {
         ctx.assertEquals("content", buff.toString());
@@ -158,7 +158,7 @@ public class CacheExpiresTest extends ProxyTestBase {
   private void testPublicInvalidClientMaxAge(TestContext ctx, long maxAge) throws Exception {
     Async latch = ctx.async();
     long now = System.currentTimeMillis();
-    SocketAddress backend = startHttpBackend(ctx, 8081, req -> {
+    SocketAddress backend = startHttpBackend(ctx, BACKEND_PORT, req -> {
       ctx.assertEquals(HttpMethod.GET, req.method());
       setCacheControl(req.response().headers(), now, 5);
       switch (hits.getAndIncrement()) {
@@ -190,12 +190,12 @@ public class CacheExpiresTest extends ProxyTestBase {
       }
     });
     startProxy(backend);
-    client.getNow(8080, "localhost", "/", resp1 -> {
+    client.getNow(FRONTEND_PORT, "localhost", "/", resp1 -> {
       ctx.assertEquals(200, resp1.statusCode());
       resp1.bodyHandler(buff -> {
         ctx.assertEquals("content", buff.toString());
         vertx.setTimer(3000, id -> {
-          client.get(8080, "localhost", "/", resp2 -> {
+          client.get(FRONTEND_PORT, "localhost", "/", resp2 -> {
             ctx.assertEquals(200, resp2.statusCode());
             resp2.bodyHandler(buff2 -> {
               ctx.assertEquals("content", buff2.toString());

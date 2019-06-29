@@ -10,6 +10,7 @@ import org.junit.Test;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -23,15 +24,18 @@ public class ProxyTest extends ProxyTestBase {
     SocketAddress[] backends = new SocketAddress[3];
     for (int i = 0;i < backends.length;i++) {
       int value = i;
-      backends[i] = startHttpBackend(ctx, 8081 + value, req -> req.response().end("" + value));
+      backends[i] = startHttpBackend(ctx, BACKEND_PORT + value, req -> req.response().end("" + value));
     }
     AtomicInteger count = new AtomicInteger();
-    startProxy(req -> Future.succeededFuture(backends[count.getAndIncrement() % backends.length]));
+    CompletableFuture future = new CompletableFuture();
+    startProxy(req -> {
+      return Future.succeededFuture(backends[count.getAndIncrement() % backends.length]);
+    });
     HttpClient client = vertx.createHttpClient();
     Map<String, AtomicInteger> result = Collections.synchronizedMap(new HashMap<>());
     Async latch = ctx.async();
     for (int i = 0;i < backends.length * numRequests;i++) {
-      client.getNow(8080, "localhost", "/", resp -> {
+      client.getNow(FRONTEND_PORT, "localhost", "/", resp -> {
         resp.bodyHandler(buff -> {
           result.computeIfAbsent(buff.toString(), k -> new AtomicInteger()).getAndIncrement();
           synchronized (result) {

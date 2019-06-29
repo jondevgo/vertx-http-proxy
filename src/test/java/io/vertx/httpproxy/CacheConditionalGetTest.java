@@ -29,7 +29,7 @@ public class CacheConditionalGetTest extends ProxyTestBase {
   private HttpClient client;
 
   @Rule
-  public WireMockRule wireMockRule = new WireMockRule(wireMockConfig().port(8081));
+  public WireMockRule wireMockRule = new WireMockRule(wireMockConfig().port(BACKEND_PORT));
 
   @Override
   public void setUp() {
@@ -51,14 +51,14 @@ public class CacheConditionalGetTest extends ProxyTestBase {
                 .withHeader("Last-Modified", ParseUtils.formatHttpDate(new Date(now - 5000)))
                 .withHeader("Expires", ParseUtils.formatHttpDate(new Date(now + 5000)))
                 .withBody("content")));
-    startProxy(new SocketAddressImpl(8081, "localhost"));
+    startProxy(new SocketAddressImpl(BACKEND_PORT, "localhost"));
     Async latch = ctx.async();
-    client.getNow(8080, "localhost", "/img.jpg", resp1 -> {
+    client.getNow(FRONTEND_PORT, "localhost", "/img.jpg", resp1 -> {
       ctx.assertEquals(200, resp1.statusCode());
       resp1.bodyHandler(buff -> {
         ctx.assertEquals("content", buff.toString());
         vertx.setTimer(3000, id -> {
-          client.get(8080, "localhost", "/img.jpg", resp2 -> {
+          client.get(FRONTEND_PORT, "localhost", "/img.jpg", resp2 -> {
             ctx.assertEquals(304, resp2.statusCode());
             resp2.bodyHandler(buff2 -> {
               ctx.assertEquals("", buff2.toString());

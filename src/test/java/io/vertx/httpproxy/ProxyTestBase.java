@@ -22,6 +22,7 @@ import org.junit.runner.RunWith;
 
 import java.io.Closeable;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
 /**
@@ -30,15 +31,24 @@ import java.util.function.Function;
 @RunWith(VertxUnitRunner.class)
 public class ProxyTestBase {
 
+  private static final AtomicInteger NEXT_PORT = new AtomicInteger(25000);
+
+  protected static final int BACKEND_PORT = NEXT_PORT.getAndIncrement();
+  protected static final int FRONTEND_PORT = NEXT_PORT.getAndIncrement();
+
   protected HttpServerOptions proxyOptions;
   protected HttpClientOptions clientOptions;
+
+  protected static int getNextPort() {
+    return NEXT_PORT.getAndIncrement();
+  }
 
 
   protected Vertx vertx;
 
   @Before
   public void setUp() {
-    proxyOptions = new HttpServerOptions().setPort(8080).setHost("localhost");
+    proxyOptions = new HttpServerOptions().setPort(FRONTEND_PORT).setHost("localhost");
     clientOptions = new HttpClientOptions();
     vertx = Vertx.vertx();
   }
