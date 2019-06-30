@@ -24,7 +24,7 @@ public class ProxyTest extends ProxyTestBase {
     SocketAddress[] backends = new SocketAddress[3];
     for (int i = 0;i < backends.length;i++) {
       int value = i;
-      backends[i] = startHttpBackend(ctx, BACKEND_PORT + value, req -> req.response().end("" + value));
+      backends[i] = startHttpBackend(ctx, this.getBackendPort(ctx) + value, req -> req.response().end("" + value));
     }
     AtomicInteger count = new AtomicInteger();
     CompletableFuture future = new CompletableFuture();
@@ -35,7 +35,7 @@ public class ProxyTest extends ProxyTestBase {
     Map<String, AtomicInteger> result = Collections.synchronizedMap(new HashMap<>());
     Async latch = ctx.async();
     for (int i = 0;i < backends.length * numRequests;i++) {
-      client.getNow(FRONTEND_PORT, "localhost", "/", resp -> {
+      client.getNow(this.getFrontendPort(ctx), "localhost", "/", resp -> {
         resp.bodyHandler(buff -> {
           result.computeIfAbsent(buff.toString(), k -> new AtomicInteger()).getAndIncrement();
           synchronized (result) {

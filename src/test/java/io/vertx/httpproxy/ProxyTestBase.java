@@ -1,5 +1,6 @@
 package io.vertx.httpproxy;
 
+import com.github.tomakehurst.wiremock.junit.WireMockRule;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Future;
 import io.vertx.core.Handler;
@@ -19,11 +20,14 @@ import io.vertx.ext.unit.junit.VertxUnitRunner;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.runner.RunWith;
+import org.junit.runners.model.Statement;
 
 import java.io.Closeable;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
+
+import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
 
 /**
  * @author <a href="mailto:julien@julienviet.com">Julien Viet</a>
@@ -32,23 +36,22 @@ import java.util.function.Function;
 public class ProxyTestBase {
 
   private static final AtomicInteger NEXT_PORT = new AtomicInteger(25000);
-
-  protected static final int BACKEND_PORT = NEXT_PORT.getAndIncrement();
-  protected static final int FRONTEND_PORT = NEXT_PORT.getAndIncrement();
+  private static final String FRONTEND_PORT = "FRONTEND_PORT";
+  private static final String BACKEND_PORT = "BACKEND_PORT";
 
   protected HttpServerOptions proxyOptions;
   protected HttpClientOptions clientOptions;
-
-  protected static int getNextPort() {
-    return NEXT_PORT.getAndIncrement();
-  }
 
 
   protected Vertx vertx;
 
   @Before
-  public void setUp() {
-    proxyOptions = new HttpServerOptions().setPort(FRONTEND_PORT).setHost("localhost");
+  public void setUp(TestContext ctx) {
+    int fePort = getNextPort();
+    int bePort = getNextPort();
+    ctx.put(FRONTEND_PORT, fePort);
+    ctx.put(BACKEND_PORT, bePort);
+    proxyOptions = new HttpServerOptions().setPort(fePort).setHost("localhost");
     clientOptions = new HttpClientOptions();
     vertx = Vertx.vertx();
   }
@@ -56,6 +59,18 @@ public class ProxyTestBase {
   @After
   public void tearDown(TestContext context) {
     vertx.close(context.asyncAssertSuccess());
+  }
+
+  protected int getFrontendPort(TestContext ctx) {
+    return ctx.get(FRONTEND_PORT);
+  }
+
+  protected int getBackendPort(TestContext ctx) {
+    return ctx.get(BACKEND_PORT);
+  }
+
+  private static int getNextPort() {
+    return NEXT_PORT.getAndIncrement();
   }
 
   protected Closeable startProxy(SocketAddress backend) {
@@ -132,6 +147,16 @@ public class ProxyTestBase {
     backendServer.listen(ctx.asyncAssertSuccess(s -> async.complete()));
     async.awaitSuccess();
     return new SocketAddressImpl(port, "localhost");
+  }
+
+  protected void run(TestContext ctx, Runnable runnable) {
+    WireMockRule wireMockRule = new WireMockRule(wireMockConfig().port(this.getBackendPort(ctx)));
+    wireMockRule.apply(new Statement() {
+      @Override
+      public void evaluate() {
+        runnable.run();
+      }
+    }, null, null);
   }
 
 }

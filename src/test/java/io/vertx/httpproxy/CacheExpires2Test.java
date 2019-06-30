@@ -31,12 +31,9 @@ public class CacheExpires2Test extends ProxyTestBase {
   private AtomicInteger hits = new AtomicInteger();
   private HttpClient client;
 
-  @Rule
-  public WireMockRule wireMockRule = new WireMockRule(wireMockConfig().port(BACKEND_PORT));
-
   @Override
-  public void setUp() {
-    super.setUp();
+  public void setUp(TestContext ctx) {
+    super.setUp(ctx);
     hits.set(0);
     client = vertx.createHttpClient(new HttpClientOptions().setKeepAlive(true));
   }
@@ -50,54 +47,56 @@ public class CacheExpires2Test extends ProxyTestBase {
 
   @Test
   public void testPublicInvalidClientMaxAgeRevalidation(TestContext ctx) throws Exception {
-    stubFor(get(urlEqualTo("/img.jpg")).inScenario("s").whenScenarioStateIs(STARTED)
-        .willReturn(
-            aResponse()
-                .withStatus(200)
-                .withHeader("Cache-Control", "public")
-                .withHeader("ETag", "tag0")
-                .withHeader("Date", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis())))
-                .withHeader("Expires", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis() + 5000)))
-                .withBody("content")));
-    stubFor(get(urlEqualTo("/img.jpg")).withHeader("If-None-Match", equalTo("tag0")).inScenario("s").whenScenarioStateIs(STARTED)
-        .willReturn(
-            aResponse()
-                .withStatus(304)
-                .withHeader("Cache-Control", "public")
-                .withHeader("etag", "tag1")
-                .withHeader("Date", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis())))
-                .withHeader("Expires", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis() + 5000))))
-        .willSetStateTo("abc"));
-    stubFor(get(urlEqualTo("/img.jpg")).inScenario("s").whenScenarioStateIs("abc")
-        .willReturn(
-            aResponse()
-                .withStatus(200)
-                .withHeader("Cache-Control", "public")
-                .withHeader("ETag", "tag1")
-                .withHeader("Date", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis())))
-                .withHeader("Expires", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis() + 5000)))
-                .withBody("content2")));
-    startProxy(new SocketAddressImpl(BACKEND_PORT, "localhost"));
-    Async latch = ctx.async();
-    client.getNow(FRONTEND_PORT, "localhost", "/img.jpg", resp1 -> {
-      ctx.assertEquals(200, resp1.statusCode());
-      resp1.bodyHandler(buff -> {
-        ctx.assertEquals("content", buff.toString());
-        vertx.setTimer(3000, id -> {
-          client.get(FRONTEND_PORT, "localhost", "/img.jpg", resp2 -> {
-            ctx.assertEquals(200, resp2.statusCode());
-            resp2.bodyHandler(buff2 -> {
-              ctx.assertEquals("content2", buff2.toString());
-//              ctx.assertNotEquals(resp1.getHeader(HttpHeaders.DATE), resp2.getHeader(HttpHeaders.DATE));
-              latch.complete();
+    this.run(ctx, () -> {
+          stubFor(get(urlEqualTo("/img.jpg")).inScenario("s").whenScenarioStateIs(STARTED)
+              .willReturn(
+                  aResponse()
+                      .withStatus(200)
+                      .withHeader("Cache-Control", "public")
+                      .withHeader("ETag", "tag0")
+                      .withHeader("Date", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis())))
+                      .withHeader("Expires", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis() + 5000)))
+                      .withBody("content")));
+          stubFor(get(urlEqualTo("/img.jpg")).withHeader("If-None-Match", equalTo("tag0")).inScenario("s").whenScenarioStateIs(STARTED)
+              .willReturn(
+                  aResponse()
+                      .withStatus(304)
+                      .withHeader("Cache-Control", "public")
+                      .withHeader("etag", "tag1")
+                      .withHeader("Date", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis())))
+                      .withHeader("Expires", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis() + 5000))))
+              .willSetStateTo("abc"));
+          stubFor(get(urlEqualTo("/img.jpg")).inScenario("s").whenScenarioStateIs("abc")
+              .willReturn(
+                  aResponse()
+                      .withStatus(200)
+                      .withHeader("Cache-Control", "public")
+                      .withHeader("ETag", "tag1")
+                      .withHeader("Date", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis())))
+                      .withHeader("Expires", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis() + 5000)))
+                      .withBody("content2")));
+          startProxy(new SocketAddressImpl(this.getBackendPort(ctx), "localhost"));
+          Async latch = ctx.async();
+          client.getNow(this.getFrontendPort(ctx), "localhost", "/img.jpg", resp1 -> {
+            ctx.assertEquals(200, resp1.statusCode());
+            resp1.bodyHandler(buff -> {
+              ctx.assertEquals("content", buff.toString());
+              vertx.setTimer(3000, id -> {
+                client.get(this.getFrontendPort(ctx), "localhost", "/img.jpg", resp2 -> {
+                  ctx.assertEquals(200, resp2.statusCode());
+                  resp2.bodyHandler(buff2 -> {
+                    ctx.assertEquals("content2", buff2.toString());
+                    //              ctx.assertNotEquals(resp1.getHeader(HttpHeaders.DATE), resp2.getHeader(HttpHeaders.DATE));
+                    latch.complete();
+                  });
+                }).putHeader(HttpHeaders.CACHE_CONTROL, "max-age=1")
+                    .putHeader(HttpHeaders.CONTENT_ENCODING, "identity")
+                    .end();
+              });
             });
-          }).putHeader(HttpHeaders.CACHE_CONTROL, "max-age=1")
-              .putHeader(HttpHeaders.CONTENT_ENCODING, "identity")
-              .end();
-        });
-      });
+          });
+          latch.awaitSuccess(10000);
     });
-    latch.awaitSuccess(10000);
 /*
     ServeEvent event1 = getAllServeEvents().get(1);
     assertNull(event1.getRequest().getHeader("If-None-Match"));
@@ -119,57 +118,59 @@ public class CacheExpires2Test extends ProxyTestBase {
   }
 
   private void testUncacheableRequestInvalidatesEntryOnOk(TestContext ctx, HttpMethod method) throws Exception {
-    stubFor(get(urlEqualTo("/img.jpg")).inScenario("s").whenScenarioStateIs(STARTED)
-        .willReturn(
-            aResponse()
-                .withStatus(200)
-                .withHeader("Cache-Control", "public")
-                .withHeader("ETag", "tag0")
-                .withHeader("Date", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis())))
-                .withHeader("Expires", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis() + 5000)))
-                .withBody("content"))
-        .willSetStateTo("abc"));
-    stubFor(get(urlEqualTo("/img.jpg")).inScenario("s").whenScenarioStateIs("abc")
-        .willReturn(
-            aResponse()
-                .withStatus(200)
-                .withHeader("Cache-Control", "public")
-                .withHeader("etag", "tag1")
-                .withHeader("Date", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis())))
-                .withHeader("Expires", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis() + 5000)))
-                .withBody("content2")));
-    stubFor(head(urlEqualTo("/img.jpg")).inScenario("s").whenScenarioStateIs("abc")
-        .willReturn(
-            aResponse()
-                .withStatus(200)
-                .withHeader("Cache-Control", "public")
-                .withHeader("etag", "tag1")
-                .withHeader("Date", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis())))
-                .withHeader("Expires", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis() + 5000)))));
-    startProxy(new SocketAddressImpl(BACKEND_PORT, "localhost"));
-    Async latch = ctx.async();
-    client.getNow(FRONTEND_PORT, "localhost", "/img.jpg", resp1 -> {
-      ctx.assertEquals(200, resp1.statusCode());
-      resp1.bodyHandler(buff -> {
-        ctx.assertEquals("content", buff.toString());
-        vertx.setTimer(3000, id -> {
-          client.request(method, FRONTEND_PORT, "localhost", "/img.jpg", resp2 -> {
-            ctx.assertEquals(200, resp2.statusCode());
-            resp2.bodyHandler(buff2 -> {
-              ctx.assertEquals(method == HttpMethod.GET ? "content2" : "", buff2.toString());
-              client.getNow(FRONTEND_PORT, "localhost", "/img.jpg", resp3 -> {
-                ctx.assertEquals(200, resp3.statusCode());
-                resp3.bodyHandler(buff3 -> {
-                  ctx.assertEquals("content2", buff3.toString());
-                  latch.complete();
-                });
+    this.run(ctx, () -> {
+          stubFor(get(urlEqualTo("/img.jpg")).inScenario("s").whenScenarioStateIs(STARTED)
+              .willReturn(
+                  aResponse()
+                      .withStatus(200)
+                      .withHeader("Cache-Control", "public")
+                      .withHeader("ETag", "tag0")
+                      .withHeader("Date", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis())))
+                      .withHeader("Expires", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis() + 5000)))
+                      .withBody("content"))
+              .willSetStateTo("abc"));
+          stubFor(get(urlEqualTo("/img.jpg")).inScenario("s").whenScenarioStateIs("abc")
+              .willReturn(
+                  aResponse()
+                      .withStatus(200)
+                      .withHeader("Cache-Control", "public")
+                      .withHeader("etag", "tag1")
+                      .withHeader("Date", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis())))
+                      .withHeader("Expires", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis() + 5000)))
+                      .withBody("content2")));
+          stubFor(head(urlEqualTo("/img.jpg")).inScenario("s").whenScenarioStateIs("abc")
+              .willReturn(
+                  aResponse()
+                      .withStatus(200)
+                      .withHeader("Cache-Control", "public")
+                      .withHeader("etag", "tag1")
+                      .withHeader("Date", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis())))
+                      .withHeader("Expires", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis() + 5000)))));
+          startProxy(new SocketAddressImpl(this.getBackendPort(ctx), "localhost"));
+          Async latch = ctx.async();
+          client.getNow(this.getFrontendPort(ctx), "localhost", "/img.jpg", resp1 -> {
+            ctx.assertEquals(200, resp1.statusCode());
+            resp1.bodyHandler(buff -> {
+              ctx.assertEquals("content", buff.toString());
+              vertx.setTimer(3000, id -> {
+                client.request(method, this.getFrontendPort(ctx), "localhost", "/img.jpg", resp2 -> {
+                  ctx.assertEquals(200, resp2.statusCode());
+                  resp2.bodyHandler(buff2 -> {
+                    ctx.assertEquals(method == HttpMethod.GET ? "content2" : "", buff2.toString());
+                    client.getNow(this.getFrontendPort(ctx), "localhost", "/img.jpg", resp3 -> {
+                      ctx.assertEquals(200, resp3.statusCode());
+                      resp3.bodyHandler(buff3 -> {
+                        ctx.assertEquals("content2", buff3.toString());
+                        latch.complete();
+                      });
+                    });
+                  });
+                }).putHeader(HttpHeaders.CACHE_CONTROL, "max-age=1").end();
               });
             });
-          }).putHeader(HttpHeaders.CACHE_CONTROL, "max-age=1").end();
-        });
-      });
+          });
+          latch.awaitSuccess(10000);
     });
-    latch.awaitSuccess(10000);
 /*
     ServeEvent event1 = getAllServeEvents().get(1);
     assertNull(event1.getRequest().getHeader("If-None-Match"));
@@ -191,89 +192,93 @@ public class CacheExpires2Test extends ProxyTestBase {
   }
 
   private void testUncacheableHeadRevalidatesEntry(TestContext ctx, int status) throws Exception {
-    stubFor(get(urlEqualTo("/img.jpg"))
-        .willReturn(
-            aResponse()
-                .withStatus(200)
-                .withHeader("Cache-Control", "public")
-                .withHeader("ETag", "tag0")
-                .withHeader("Date", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis())))
-                .withHeader("Expires", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis() + 5000)))
-                .withBody("content")));
-    stubFor(head(urlEqualTo("/img.jpg"))
-        .willReturn(
-            aResponse()
-                .withStatus(status)
-                .withHeader("Cache-Control", "public")
-                .withHeader("ETag", "tag0")
-                .withHeader("Date", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis())))
-                .withHeader("Expires", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis() + 5000)))));
-    startProxy(new SocketAddressImpl(BACKEND_PORT, "localhost"));
-    Async latch = ctx.async();
-    client.getNow(FRONTEND_PORT, "localhost", "/img.jpg", resp1 -> {
-      ctx.assertEquals(200, resp1.statusCode());
-      resp1.bodyHandler(buff -> {
-        ctx.assertEquals("content", buff.toString());
-        vertx.setTimer(3000, id -> {
-          client.head(FRONTEND_PORT, "localhost", "/img.jpg", resp2 -> {
-            ctx.assertEquals(200, resp2.statusCode());
-            resp2.bodyHandler(buff2 -> {
-              ctx.assertEquals("", buff2.toString());
-              latch.complete();
-            });
-          }).putHeader(HttpHeaders.CACHE_CONTROL, "max-age=1").end();
+    this.run(ctx, () -> {
+      stubFor(get(urlEqualTo("/img.jpg"))
+          .willReturn(
+              aResponse()
+                  .withStatus(200)
+                  .withHeader("Cache-Control", "public")
+                  .withHeader("ETag", "tag0")
+                  .withHeader("Date", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis())))
+                  .withHeader("Expires", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis() + 5000)))
+                  .withBody("content")));
+      stubFor(head(urlEqualTo("/img.jpg"))
+          .willReturn(
+              aResponse()
+                  .withStatus(status)
+                  .withHeader("Cache-Control", "public")
+                  .withHeader("ETag", "tag0")
+                  .withHeader("Date", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis())))
+                  .withHeader("Expires", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis() + 5000)))));
+      startProxy(new SocketAddressImpl(this.getBackendPort(ctx), "localhost"));
+      Async latch = ctx.async();
+      client.getNow(this.getFrontendPort(ctx), "localhost", "/img.jpg", resp1 -> {
+        ctx.assertEquals(200, resp1.statusCode());
+        resp1.bodyHandler(buff -> {
+          ctx.assertEquals("content", buff.toString());
+          vertx.setTimer(3000, id -> {
+            client.head(this.getFrontendPort(ctx), "localhost", "/img.jpg", resp2 -> {
+              ctx.assertEquals(200, resp2.statusCode());
+              resp2.bodyHandler(buff2 -> {
+                ctx.assertEquals("", buff2.toString());
+                latch.complete();
+              });
+            }).putHeader(HttpHeaders.CACHE_CONTROL, "max-age=1").end();
+          });
         });
       });
+      latch.awaitSuccess(10000);
+      ServeEvent event1 = getAllServeEvents().get(1);
+      assertNull(event1.getRequest().getHeader("If-None-Match"));
+      assertEquals(200, event1.getResponse().getStatus());
+      ServeEvent event0 = getAllServeEvents().get(0);
+      assertEquals("tag0", event0.getRequest().getHeader("If-None-Match"));
+      assertEquals(status, event0.getResponse().getStatus());
     });
-    latch.awaitSuccess(10000);
-    ServeEvent event1 = getAllServeEvents().get(1);
-    assertNull(event1.getRequest().getHeader("If-None-Match"));
-    assertEquals(200, event1.getResponse().getStatus());
-    ServeEvent event0 = getAllServeEvents().get(0);
-    assertEquals("tag0", event0.getRequest().getHeader("If-None-Match"));
-    assertEquals(status, event0.getResponse().getStatus());
   }
 
   @Test
   public void testHeadDoesNotPopulateCache(TestContext ctx) throws Exception {
-    stubFor(get(urlEqualTo("/img.jpg"))
-        .willReturn(
-            aResponse()
-                .withStatus(200)
-                .withHeader("Cache-Control", "public")
-                .withHeader("ETag", "tag0")
-                .withHeader("Date", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis())))
-                .withHeader("Expires", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis() + 5000)))
-                .withBody("content")));
-    stubFor(head(urlEqualTo("/img.jpg"))
-        .willReturn(
-            aResponse()
-                .withStatus(200)
-                .withHeader("Cache-Control", "public")
-                .withHeader("ETag", "tag0")
-                .withHeader("Date", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis())))
-                .withHeader("Expires", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis() + 5000)))));
-    startProxy(new SocketAddressImpl(BACKEND_PORT, "localhost"));
-    Async latch = ctx.async();
-    client.headNow(FRONTEND_PORT, "localhost", "/img.jpg", resp1 -> {
-      ctx.assertEquals(200, resp1.statusCode());
-      resp1.bodyHandler(buff -> {
-        ctx.assertEquals("", buff.toString());
-        client.getNow(FRONTEND_PORT, "localhost", "/img.jpg", resp2 -> {
-          ctx.assertEquals(200, resp2.statusCode());
-          resp2.bodyHandler(buff2 -> {
-            ctx.assertEquals("content", buff2.toString());
-            latch.complete();
+    this.run(ctx, () -> {
+      stubFor(get(urlEqualTo("/img.jpg"))
+          .willReturn(
+              aResponse()
+                  .withStatus(200)
+                  .withHeader("Cache-Control", "public")
+                  .withHeader("ETag", "tag0")
+                  .withHeader("Date", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis())))
+                  .withHeader("Expires", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis() + 5000)))
+                  .withBody("content")));
+      stubFor(head(urlEqualTo("/img.jpg"))
+          .willReturn(
+              aResponse()
+                  .withStatus(200)
+                  .withHeader("Cache-Control", "public")
+                  .withHeader("ETag", "tag0")
+                  .withHeader("Date", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis())))
+                  .withHeader("Expires", ParseUtils.formatHttpDate(new Date(System.currentTimeMillis() + 5000)))));
+      startProxy(new SocketAddressImpl(this.getBackendPort(ctx), "localhost"));
+      Async latch = ctx.async();
+      client.headNow(this.getFrontendPort(ctx), "localhost", "/img.jpg", resp1 -> {
+        ctx.assertEquals(200, resp1.statusCode());
+        resp1.bodyHandler(buff -> {
+          ctx.assertEquals("", buff.toString());
+          client.getNow(this.getFrontendPort(ctx), "localhost", "/img.jpg", resp2 -> {
+            ctx.assertEquals(200, resp2.statusCode());
+            resp2.bodyHandler(buff2 -> {
+              ctx.assertEquals("content", buff2.toString());
+              latch.complete();
+            });
           });
         });
       });
+      latch.awaitSuccess(10000);
+      ServeEvent event1 = getAllServeEvents().get(1);
+      assertNull(event1.getRequest().getHeader("If-None-Match"));
+      assertEquals(200, event1.getResponse().getStatus());
+      ServeEvent event0 = getAllServeEvents().get(0);
+      assertEquals(null, event0.getRequest().getHeader("If-None-Match"));
+      assertEquals(200, event0.getResponse().getStatus());
     });
-    latch.awaitSuccess(10000);
-    ServeEvent event1 = getAllServeEvents().get(1);
-    assertNull(event1.getRequest().getHeader("If-None-Match"));
-    assertEquals(200, event1.getResponse().getStatus());
-    ServeEvent event0 = getAllServeEvents().get(0);
-    assertEquals(null, event0.getRequest().getHeader("If-None-Match"));
-    assertEquals(200, event0.getResponse().getStatus());
   }
 }
